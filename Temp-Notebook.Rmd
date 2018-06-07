@@ -1,0 +1,171 @@
+---
+title: "R Notebook"
+output: html_notebook
+---
+
+This is an [R Markdown](http://rmarkdown.rstudio.com) Notebook. When you execute code within the notebook, the results appear beneath the code. 
+
+Try executing this chunk by clicking the *Run* button within the chunk or by placing your cursor inside it and pressing *Ctrl+Shift+Enter*. 
+
+```{r include=FALSE}
+library(ggplot2)
+library(dplyr)
+library(lubridate)
+library(tidyr)
+library(viridis)
+library(countrycode)
+library(highcharter)
+
+
+library(ggbeeswarm)
+library(gridExtra)
+
+
+data_city <- read.csv("input/GlobalLandTemperaturesByCity.csv")
+data_country <- read.csv("input/GlobalLandTemperaturesByCountry.csv")
+data_global <- read.csv("input/GlobalTemperatures.csv")
+
+
+
+```
+
+Dando Formato
+
+```{r}
+data_city$dt <- as.Date(data_city$dt)
+data_city$year <- format(data_city$dt,"%Y")
+data_city$month <- format(data_city$dt,"%m")
+data_country$dt <- as.Date(data_country$dt)
+data_country$year <- format(data_country$dt,"%Y")
+data_country$month <- format(data_country$dt,"%m")
+data_global$dt <- as.Date(data_global$dt)
+data_global$year <- format(data_global$dt,"%Y")
+ClimateCityArgentina <- data_city[data_city$Country=="Argentina",]
+
+```
+
+Evolucion de la Temperatura Global de 1796 a 2013
+```{r}
+data_world <- data_global%>%group_by(year)%>%summarize(Avg_Temp=mean(LandAverageTemperature,na.rm=T))%>%filter(Avg_Temp>6.5)
+data_world$year <- as.numeric(data_world$year)
+
+ggplot(data_world, aes(x=year, y=Avg_Temp,color=Avg_Temp))+
+  geom_point()+
+   scale_color_viridis(option = "B")+
+  geom_smooth(method = "lm")+
+  theme(axis.line = element_line(color = "orange",size=1))+
+  scale_x_continuous(breaks = seq(1750, 2013, by = 20))+
+  scale_y_continuous()+
+  theme(panel.background=element_blank())+
+  theme(legend.position = "bottom",axis.title = element_blank(),
+                     axis.text = element_text(size = 12,face="bold"),
+        plot.title = element_text(size=16,face = "bold")) + 
+  ggtitle("Global Land Average Temperature is increasing",subtitle = "1796 to 2013 ") 
+```
+
+```{r}
+data_ind = data_country%>%filter(Country=="Argentina")
+
+data_ind <- data_ind%>%group_by(year)%>%summarize(Avg_Temp=mean(AverageTemperature,na.rm=T))
+data_ind <-data_ind%>%filter(!is.na(Avg_Temp))
+data_ind$year <- as.numeric(data_ind$year)
+
+ggplot(data_ind, aes(x=year, y=Avg_Temp,color=Avg_Temp))+
+  geom_point()+
+   scale_color_viridis(option = "B")+
+  geom_smooth(method = "lm")+
+  theme(axis.line = element_line(color = "orange",size=1))+
+  scale_x_continuous(breaks = seq(1750, 2013, by = 15))+
+  scale_y_continuous(breaks = seq(10,17,by=1))+
+  theme(panel.background=element_blank())+
+  theme(legend.position = "bottom",axis.title = element_blank(),
+                     axis.text = element_text(size = 12,face="bold"),
+        plot.title = element_text(size=16,face = "bold")) + 
+  ggtitle("Average Temperature increasing in Argentina",subtitle = "1796 to 2013 ") 
+```
+
+```{r}
+data_india = data_country%>%filter(Country=="Argentina")
+data_india <- data_india%>%group_by(year)%>%summarize(max=max(AverageTemperature),min=min(AverageTemperature),Avg_Temp=mean(AverageTemperature,na.rm=T))
+
+data_india <- gather(data_india,level,Temp, 2:4)
+data_india <-data_india%>%filter(!is.na(Temp))
+
+ggplot(data_india, aes(x=year, y=Temp,colour=Temp,group=level))+
+  geom_line()+
+   scale_color_viridis(option = "B")+
+  scale_x_discrete(breaks = seq(1750, 2013, by = 40))+
+  theme(panel.background=element_blank())+
+  theme(legend.position = "bottom",axis.title = element_blank(),
+                     axis.text = element_text(size = 12,face="bold"),
+        plot.title = element_text(size=16,face = "bold")) + 
+  ggtitle("Min, Avg and Max Temperature in Argentina",subtitle = "1796 to 2013 ") 
+```
+```{r}
+Major_Cities<- c("Rosario","Comodoro Rivadavia", "Jujuy", "Bahia Blanca" ,"San Martin","Posadas","Neuquen")
+
+  
+
+ClimateCityArgentina %>% filter(City %in% Major_Cities) %>% group_by(City,year) %>% summarise(avg_temp= mean(AverageTemperature)) %>% ggplot(aes(year,avg_temp,color=avg_temp)) + 
+    geom_point() +
+  scale_x_discrete( breaks = c(1865,2013))+ theme_minimal(base_family = "Ubuntu Condensed")+ scale_color_viridis(option="B")+
+  theme(axis.text.x = element_text(angle = 90, hjust = 1),
+        panel.spacing = unit(0.4, "lines"),legend.position = "top",
+        legend.text=element_text(size=8),
+        panel.grid.major.y = element_blank(),panel.grid.minor.y = element_blank(),
+        axis.ticks.y = element_blank(),
+        axis.ticks.x = element_blank(),
+        plot.background = element_rect(fill = "#EFF2F4"),
+        legend.key.height = unit(10, "pt"),
+        legend.key.width = unit(70, "pt"))+
+        ggtitle("Temperature Change over the last two centuries",subtitle = "Indian Cities")+
+         ylab("Temperature")+labs(color="Temperature")+
+facet_grid(~City )
+```
+
+
+Cambios en Temp Promedio de Argentina cada 30 años
+
+```{r}
+data_arg = data_country %>% filter(Country=="Argentina") %>% filter(year =='1925' |year =='1955' |year =='1985'|year=='2012') %>% group_by(year,month)
+autoplot(data_arg)
+ggseasonplot(data_arg,polar=TRUE)
+
+
+
+```
+
+Cambios en Temp Promedio de Rosario cada 30 años
+
+```{r}
+data_ros = data_city %>% filter(City=="Rosario") %>% filter(year=="2013") %>% group_by(year,month)%>%
+autoplot(data_ros)
+ggseasonplot(data_arg,polar=TRUE)
+
+
+
+```
+
+
+
+Evolucion de la Temperatura Media Argentina 
+```{r}
+mea_c <- c("Argentina")
+mea<-data_country %>%filter(Country %in% mea_c)%>%group_by(year,Country)%>%mutate(no=length(year))%>%filter(no==12)%>%arrange(month)
+
+ggplot(mea,aes(month,AverageTemperature, group=year,color =as.numeric(year))) + geom_line(alpha= 0.5) +
+  theme(axis.line = element_line(color = "orange",size=1))+
+      theme(panel.background=element_blank())+ scale_color_viridis(option="D")+
+      scale_x_discrete()+labs(color="year") +
+   facet_wrap(~Country)+
+    xlab("Month")+ylab("Average Temperature")+
+  theme(legend.position = "bottom",
+                     axis.text = element_text(size = 10,face="bold"),
+        plot.title = element_text(size=16,face = "bold")) + 
+  ggtitle("Average Temperature increasing in Argentina") 
+```
+
+
+Add a new chunk by clicking the *Insert Chunk* button on the toolbar or by pressing *Ctrl+Alt+I*.
+
+When you save the notebook, an HTML file containing the code and output will be saved alongside it (click the *Preview* button or press *Ctrl+Shift+K* to preview the HTML file).
